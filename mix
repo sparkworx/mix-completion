@@ -29,6 +29,7 @@ _mix_lock_checksum() {
 
 _mix_refresh_cache() {
   local project_root="$1" cache_file="$2"
+  [[ -f "$HOME/.mix_tasks" ]] && rm "$HOME/.mix_tasks"
   mkdir -p "$HOME/.mix_tasks"
   local checksum
   checksum=$(_mix_lock_checksum "$project_root") || checksum="none"
