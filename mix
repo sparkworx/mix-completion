@@ -1,99 +1,70 @@
 #!/bin/bash
-RED=$(tput setaf 1)
-GREEN=$(tput setaf 2)
-YELLOW=$(tput setaf 3)
-NC='\033[0m' # No Color
+#
+# Bash completion for Elixir's mix build tool.
+# Per-project task caching with automatic invalidation via mix.lock checksums.
 
-# Usage:
-# m      → mix help
-# m a    → mix archive
-# m h    → mix hex
-# m a.b  → mix archive.build
-# m d.co → mix deps.compile
-# m p.n  → mix phoenix.new
-function m {
-  if [ "$1" == "refresh" ]; then
-    mix help | grep ^mix | awk '{ print $2 }' | sed "s/#//" | grep -v help | grep . | awk '{ print length, $0 }' | sort -n -s | cut -d" " -f2- > ~/.mix_tasks
-  elif [ ! -f ~/.mix_tasks ]; then
-    m refresh
-    m $@
-    printf "\nCreated ${YELLOW}~/.mix_tasks${NC}...\n\n"
-    printf "Use shortcuts:\n"
-    printf "  ${YELLOW}m a${NC} → ${GREEN}mix archive${NC}\n"
-    printf "  ${YELLOW}m d.co${NC} → ${GREEN}mix deps.compile${NC}\n"
-  elif [ -z "$1" ] || [ "$1" == "help" ]; then
-    mix help | sed "s/^/\\${GREEN}/" | sed "s/#/\\${NC}/" | xargs -0 printf
-  else
-    local commands=`cat ~/.mix_tasks`
-    if [[ $1 =~ \..+\. ]]; then
-      local shortcut=(${1//./ })
-      while read -r line; do
-        if [[ $line =~ \..+\. ]] ; then
-          local cmd=(${line//./ })
-          if [[ ${cmd[0]} == ${shortcut[0]}* ]] && [[ ${cmd[1]} == ${shortcut[1]}* ]] && [[ ${cmd[2]} == ${shortcut[2]}* ]]; then
-            shift
-            printf "${YELLOW}mix $line $@${NC}\n"
-            mix $line $@
-            return
-          fi
-        fi
-      done <<< "$commands"
-    elif [[ $1 =~ \. ]]; then
-      local shortcut=(${1//./ })
-      while read -r line; do
-        if [[ $line =~ \. ]] ; then
-          local cmd=(${line//./ })
-          if [[ ${cmd[0]} == ${shortcut[0]}* ]] && [[ ${cmd[1]} == ${shortcut[1]}* ]]; then
-            shift
-            printf "${YELLOW}mix $line $@${NC}\n"
-            mix $line $@
-            return
-          fi
-        fi
-      done <<< "$commands"
-    else
-      while read -r line; do
-        if [[ $line == $1* ]]; then
-          shift
-          printf "${YELLOW}mix $line $@${NC}\n"
-          mix $line $@
-          return
-        fi
-      done <<< "$commands"
-    fi
-    local new_commands=`mix help | grep ^mix | awk '{ print $2 }' | sed "s/#//" | grep -v help | grep .`
-    local added=false
-    while read -r line; do
-      if ! printf '%s\n\0' "${commands[@]}" | grep -Fqx $line
-      then
-        if ! $added ; then
-          printf "Adding to ${YELLOW}~/.mix_tasks${NC} for shortcut resolution:\n"
-        fi
-        added=true
-        printf "Added ${GREEN}$line${NC}\n"
-        echo $line >> ~/.mix_tasks
-      fi
-    done <<< "$new_commands"
-    if [ $added == true ]; then
-      cat ~/.mix_tasks | awk '{ print length, $0 }' | sort -n -s | cut -d" " -f2- > ~/._mix_tasks
-      mv ~/._mix_tasks ~/.mix_tasks
-      m $@
-    else
-      printf "${RED}Task not found${NC}\n"
-    fi
+_mix_project_root() {
+  local dir="$PWD"
+  while [[ "$dir" != "/" ]]; do
+    [[ -f "$dir/mix.exs" ]] && echo "$dir" && return 0
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+_mix_cache_file() {
+  local hash
+  hash=$(printf '%s' "$1" | md5sum 2>/dev/null || printf '%s' "$1" | md5)
+  hash="${hash%% *}"
+  echo "$HOME/.mix_tasks/$hash"
+}
+
+_mix_lock_checksum() {
+  local lock="$1/mix.lock"
+  [[ -f "$lock" ]] || return 1
+  local sum
+  sum=$(md5sum "$lock" 2>/dev/null || md5 "$lock")
+  echo "${sum%% *}"
+}
+
+_mix_refresh_cache() {
+  local project_root="$1" cache_file="$2"
+  mkdir -p "$HOME/.mix_tasks"
+  local checksum
+  checksum=$(_mix_lock_checksum "$project_root") || checksum="none"
+  local tasks
+  tasks=$(mix help 2>/dev/null | grep '^mix ' | awk '{print $2}' | sed 's/#//' | grep -v '^help$' | grep . | awk '{print length, $0}' | sort -n -s | cut -d' ' -f2-)
+  { echo "$checksum"; echo "$tasks"; } > "$cache_file"
+}
+
+_mix_ensure_cache() {
+  local project_root="$1" cache_file="$2"
+  if [[ -f "$cache_file" ]]; then
+    local stored current
+    stored=$(head -1 "$cache_file")
+    current=$(_mix_lock_checksum "$project_root") || current="none"
+    [[ "$stored" == "$current" ]] && return 0
   fi
+  _mix_refresh_cache "$project_root" "$cache_file"
 }
 
-_mix()
-{
-    local cur prev opts
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts=`mix help | grep ^mix | awk '{ print $2 }' | sed "s/#//" | grep -v help | grep .`
+_mix() {
+  local cur
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
 
-    COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
-    return 0
+  local project_root tasks
+  if project_root=$(_mix_project_root); then
+    local cache_file
+    cache_file=$(_mix_cache_file "$project_root")
+    _mix_ensure_cache "$project_root" "$cache_file"
+    tasks=$(tail -n +2 "$cache_file")
+  else
+    tasks=$(mix help 2>/dev/null | grep '^mix ' | awk '{print $2}' | sed 's/#//' | grep -v '^help$' | grep .)
+  fi
+
+  COMPREPLY=($(compgen -W "$tasks" -- "$cur"))
+  return 0
 }
-complete -F _mix m
+
 complete -F _mix mix
