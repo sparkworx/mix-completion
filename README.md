@@ -1,5 +1,5 @@
-mix-power-completion
-====================
+mix-completion
+==============
 
 Fast bash completion for Elixir's [mix](https://hexdocs.pm/mix/) build tool with per-project caching.
 
@@ -16,14 +16,14 @@ Fast bash completion for Elixir's [mix](https://hexdocs.pm/mix/) build tool with
 
 Clone and source the script:
 
-    git clone git@github.com:davidhq/mix-power-completion.git
-    cd mix-power-completion
+    git clone git@github.com:sparkworx/mix-completion.git
+    cd mix-completion
     sudo cp mix /etc/bash_completion.d/
     source /etc/bash_completion.d/mix
 
 Or install locally — add to `~/.bashrc`:
 
-    source /path/to/mix-power-completion/mix
+    source /path/to/mix-completion/mix
 
 ### Homebrew
 
