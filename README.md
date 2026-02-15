@@ -1,67 +1,65 @@
-Mix completion plus shortcuts and colors
-========================================
+mix-power-completion
+====================
 
-Bash autocompletion for Elixir [mix](http://elixir-lang.org/getting-started/mix-otp/introduction-to-mix.html).
+Fast bash completion for Elixir's [mix](https://hexdocs.pm/mix/) build tool with per-project caching.
 
-## Power features
+## Features
 
-### Shortcuts
+- **Per-project caching** — each project gets its own task cache in `~/.mix_tasks/`
+- **Auto-invalidation** — cache refreshes automatically when `mix.lock` changes
+- **Lazy** — cache is created on first TAB press, no setup needed
+- **Graceful fallback** — works outside mix projects (uncached)
 
-You can invoke tasks in a shorter way without pressing `TAB`:
+## Install
 
-    m      → mix help
-    m a    → mix archive
-    m h    → mix hex
-    m a.b  → mix archive.build
-    m d.co → mix deps.compile
-    m p.n  → mix phoenix.new
+### Manual
 
-### Colors
+Clone and source the script:
 
-When you execute `m` (or `m help`), tasks are colored green.
+    git clone git@github.com:davidhq/mix-power-completion.git
+    cd mix-power-completion
+    sudo cp mix /etc/bash_completion.d/
+    source /etc/bash_completion.d/mix
 
-## Install via homebrew
+Or install locally — add to `~/.bashrc`:
 
-`brew tap homebrew/completions`
+    source /path/to/mix-power-completion/mix
 
-`brew install mix-completion`
+### Homebrew
 
-More about [homebrew completions](https://github.com/Homebrew/homebrew-completions).
-
-## Manual install
-
-Global:
-
-    $ git clone git@github.com:davidhq/mix-power-completion.git
-    $ cd mix-power-completion
-    $ sudo cp mix /etc/bash_completion.d/
-    $ source /etc/bash_completion.d/mix
-    (on new terminal tabs, this should be autoloaded)
-
-Local:
-
-    $ ~/bash_completion.d
-    $ cp mix ~/bash_completion.d/
-
-Add to `~/.bashrc`:
-
-    if [ -f "$HOME/bash_completion.d/mix" ] ; then
-        source $HOME/bash_completion.d/mix
-    fi
+    brew tap homebrew/completions
+    brew install mix-completion
 
 ## Usage
 
-To list all currently avaliable mix tasks:
+    $ mix <TAB>
+      archive  archive.build  compile  deps  deps.clean  ...
 
-    $ m [TAB]
-      archive            archive.uninstall        ....
+    $ mix dep<TAB>
+      deps  deps.clean  deps.compile  deps.get  deps.tree  deps.unlock  deps.update
 
-    $ mix [TAB]
-      archive            archive.uninstall        ....
+The first TAB press in a project has a brief delay while the task list is built. Subsequent completions are instant.
 
-To complete command:
+## Cache management
 
-    $ m t[TAB]
-      m test
+Caches are stored in `~/.mix_tasks/`. To reset all caches:
 
-There will be a slight lag because mix has to check what is available for the current project.
+    rm -rf ~/.mix_tasks/
+
+Individual project caches are invalidated automatically when `mix.lock` changes (e.g. after `mix deps.get`).
+
+## Acknowledgments
+
+This project was originally created by [David Krmpotic](https://github.com/davidhq) as
+[mix-power-completion](https://github.com/davidhq/mix-power-completion) — a bash completion
+script for Elixir's mix with clever shortcut expansion and colored output. Thank you, David,
+for the inspiration and the foundation this builds on.
+
+This fork is a ground-up rewrite that narrows the scope to bash completion only, replacing
+the global task cache and `m` shortcut wrapper with per-project caching and automatic
+invalidation via `mix.lock` checksums. The original shortcut and color features have been
+removed in favor of a smaller, faster script focused solely on TAB completion.
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) for details.
